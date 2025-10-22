@@ -3,7 +3,7 @@ Homework-1: Multiclass Classification
 Part 1: MNIST Dataset Classification using SGDClassifier
 
 Author: Kiro AI Assistant
-Date: 2025-10-06
+Date: 2025-10-13
 """
 
 import numpy as np
@@ -79,7 +79,29 @@ class MNISTClassifier:
 
         
         return cv_scores.mean()     # 回傳交叉驗證的平均準確率
-    
+
+    #NEW ADD
+    def random_shift_image(self, image):
+        """隨機平移 -1~1 像素"""
+        if np.random.randint(0, 2) == 0:
+            dx = np.random.randint(-1, 2)
+            dy = 0
+        else:
+            dy = np.random.randint(-1, 2)
+            dx = 0
+        image = image.reshape(28, 28)
+        shifted = shift(image, [dy, dx], cval=0, mode='constant')
+        return shifted.reshape(784)
+
+    def random_rotate_image(self, image):
+        """隨機旋轉 ±(3、6) 度"""
+        angle = np.random.choice([2, 4]) * np.random.choice([-1, 1])
+        image = image.reshape(28, 28)
+        rotated = rotate(image, angle, reshape=False, cval=0, mode='constant')
+        return rotated.reshape(784)
+
+
+
     def shift_image(self, image, dx, dy):
         """
         移動圖像指定的像素數
@@ -95,76 +117,88 @@ class MNISTClassifier:
         shifted = shift(image, [dy, dx], cval=0, mode='constant')
         return shifted.reshape(784)                 # 把結果再攤平成一維向量返回
     
-    def augment_dataset(self, X, y, augment_size=10000):
-        """
-        對數據集進行增強
-        Args:
-            X: 原始特徵數據
-            y: 原始標籤
-            augment_size: 要生成的增強樣本數量
-        Returns:
-            增強後的特徵和標籤
-        """
-        print(f"Generating {augment_size} augmented samples...")
+    def augment_dataset(self, X, y, augment_size=10000, method="shift"):
+        """產生指定方法與數量的增強資料"""
+        print(f"Generating {augment_size} augmented samples with method '{method}'...")
         
         # 隨機選擇要增強的樣本（可重複抽樣）
         indices = np.random.choice(len(X), augment_size, replace=True)
         
-        augmented_X = []
-        augmented_y = []
+        augmented_X, augmented_y = [], []
         
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # 左、右、上、下
+        #directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # 左、右、上、下
         
         for i, idx in enumerate(indices):
-            if i % 2000 == 0:
-                print(f"Progress: {i}/{augment_size}")
-                
-            # 隨機選擇移動方向
-            # np.random.randint(0,4) 隨機產生 0~3 的整數，對應 directions 的索引
-            dx, dy = directions[np.random.randint(0, 4)]
-            
+            img = X[idx]
+            if method == "shift":
+                aug_img = self.random_shift_image(img)
+            elif method == "rotate":
+                aug_img = self.random_rotate_image(img)
+            elif method == "mixed":
+                if np.random.rand() < 0.5:
+                    aug_img = self.random_shift_image(img)
+                else:
+                    aug_img = self.random_rotate_image(img)
+            else:
+                raise ValueError(f"Unknown augmentation method: {method}")
             # 生成擴增樣本（對選到的樣本做平移）
-            augmented_image = self.shift_image(X[idx], dx, dy)
-            augmented_X.append(augmented_image)     # 加入擴增後的影像
+            #augmented_image = self.shift_image(X[idx], dx, dy)
+            augmented_X.append(aug_img)     # 加入擴增後的影像
             augmented_y.append(y[idx])              # 標籤與原圖相同
+
+            if (i + 1) % 4000 == 0:
+                print(f"Progress: {i+1}/{augment_size}")
         
         # 回傳 numpy 陣列形式的增強資料與標籤，以利後續訓練使用
         return np.array(augmented_X), np.array(augmented_y)
     
     def task_1_2_data_augmentation(self):
         """
-        Task 1.2: 使用資料擴增來改善準確率
+        Task 1.2: 強化版資料增強實驗
+        比較三種增強方式 × 三種樣本數
         """
         print("\n" + "="*50)
-        print("Task 1.2: Data Augmentation")
+        print("Task 1.2: Enhanced Data Augmentation Experiments")
         print("="*50)
         
-        # 生成擴增數據
-        augmented_X, augmented_y = self.augment_dataset(self.X_train, self.y_train)
+        methods = ["shift", "rotate", "mixed"]
+        augment_sizes = [8000, 10000, 12000]
+
+        results = {}
+
+        for method in methods:
+            results[method] = {}
+            for size in augment_sizes:
+                print(f"\n[Experiment] Method = {method}, Size = {size}")
+                aug_X, aug_y = self.augment_dataset(self.X_train, self.y_train, augment_size=size, method=method)
+                
+                X_combined = np.vstack([self.X_train, aug_X])
+                y_combined = np.hstack([self.y_train, aug_y])
+                
+                sgd = SGDClassifier(random_state=42)
+                cv_scores = cross_val_score(sgd, X_combined, y_combined, cv=3, scoring="accuracy")
+                
+                mean_acc = cv_scores.mean()
+                print(f"CV scores: {cv_scores}")
+                print(f"Mean accuracy: {mean_acc:.4f}")
+                
+                results[method][size] = mean_acc
         
-        # 合併原始資料和擴增資料；vstack 會在垂直方向（第一維）疊加陣列
-        X_combined = np.vstack([self.X_train, augmented_X])
-        y_combined = np.hstack([self.y_train, augmented_y])     # hstack 將標籤水平串接成一維陣列
+        print("\n=== Data Augmentation Summary ===")
+        for method in methods:
+            for size in augment_sizes:
+                print(f"Method={method:6} | Size={size:6} | Accuracy={results[method][size]:.4f}")
         
-        print(f"Original training set size: {len(self.X_train)}")
-        print(f"Augmented samples: {len(augmented_X)}")
-        print(f"Combined training set size: {len(X_combined)}")
+        # 找出最佳設定
+        best_method, best_size = max(
+            ((m, s) for m in methods for s in augment_sizes),
+            key=lambda x: results[x[0]][x[1]]
+        )
         
-        # 使用擴增後的資料進行交叉驗證（新的 SGDClassifier 實例以避免覆蓋原模型）
-        sgd_augmented = SGDClassifier(random_state=42)
-        print("Performing 3-fold cross-validation with augmented data...")
-        cv_scores_augmented = cross_val_score(sgd_augmented, X_combined, y_combined, 
-                                            cv=3, scoring="accuracy")
-        
-        print(f"Augmented CV scores: {cv_scores_augmented}")
-        print(f"Augmented mean accuracy: {cv_scores_augmented.mean():.4f}")
-        print(f"Augmented standard deviation: {cv_scores_augmented.std():.4f}")
-        
-        # 訓練最終模型（在合併後整個訓練集上 fit）
-        sgd_augmented.fit(X_combined, y_combined)
-        self.sgd_clf_augmented = sgd_augmented      # 保存擴增後的模型以備後用
-        
-        return cv_scores_augmented.mean()           # 回傳擴增後的交叉驗證平均準確率
+        print(f"\nBest augmentation: method={best_method}, size={best_size}, "
+            f"accuracy={results[best_method][best_size]:.4f}")
+
+        return results         
     
     def task_1_3_confusion_matrix_analysis(self):
         """
@@ -264,7 +298,7 @@ def main():
     
     # 執行Task 1.2
     accuracy_augmented = classifier.task_1_2_data_augmentation()
-    print(f"\nTask 1.2 completed with accuracy: {accuracy_augmented:.4f}")
+    print(f"\nTask 1.2 completed with accuracy: {accuracy_augmented}")
     
     # 執行Task 1.3
     accuracy_optimized = classifier.task_1_3_confusion_matrix_analysis()
