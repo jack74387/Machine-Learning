@@ -244,6 +244,8 @@ train_gradient_boosting(X_train, y_train, X_val, y_val)
 .
 ├── homework2_ensemble.py          # 主程式（Part 1 & 2）
 ├── bonus_ensemble_methods.py      # Bonus 進階方法
+├── FIN_homework2_ensemble.py      # 基礎 + Bonus 方法 with Confusion matrix (Final version)
+├── FIN_OUTPUT-2                   # 上一個的 OUTPUT
 ├── test_quick.py                  # 快速測試腳本
 ├── requirements.txt               # Python 套件需求
 ├── task.md                        # 本檔案（作業記錄）

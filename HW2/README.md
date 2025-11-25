@@ -26,6 +26,10 @@ pip install numpy scikit-learn
 
 ```bash
 python homework2_ensemble.py
+
+#Final version with bonus methods
+python FIN_homework2_ensemble.py
+
 ```
 
 這會執行完整的實驗，包括：
@@ -39,6 +43,7 @@ python homework2_ensemble.py
 .
 ├── homework2_ensemble.py          # 主程式（必做部分）
 ├── bonus_ensemble_methods.py      # Bonus 進階方法
+├── FIN_homework2_ensemble.py      # 最終版本 with bonus methods & 混淆矩陣
 ├── task.md                        # 作業記錄文件
 └── README.md                      # 本檔案
 ```
